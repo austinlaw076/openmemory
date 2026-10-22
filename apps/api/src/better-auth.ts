@@ -45,7 +45,7 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
     ],
     emailAndPassword: {
       enabled: true,
-      disableSignUp: true,
+      disableSignUp: env.OPENMEMORY_ALLOW_SIGN_UP !== "true",
     },
     socialProviders,
     advanced: {

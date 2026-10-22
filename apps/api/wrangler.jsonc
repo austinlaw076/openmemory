@@ -6,12 +6,6 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
-  "routes": [
-    {
-      "pattern": "openmemory.openvm067.space/*",
-      "zone_name": "openvm067.space"
-    }
-  ],
   "triggers": {
     "crons": ["*/15 * * * *"]
   },

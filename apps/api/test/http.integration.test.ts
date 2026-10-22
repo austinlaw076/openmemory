@@ -1350,6 +1350,7 @@ test("worker emits operational headers and rate limits repeated requests", async
 
 test("worker API uses Better Auth session cookies as deployed tenant identity", async () => {
   const worker = await startWorker({
+    OPENMEMORY_ALLOW_SIGN_UP: "true",
     BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
   });
   workers.push(worker);
@@ -1632,6 +1633,7 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
 
 test("worker API manages account workspace and team members", async () => {
   const worker = await startWorker({
+    OPENMEMORY_ALLOW_SIGN_UP: "true",
     BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
   });
   workers.push(worker);
