@@ -68,7 +68,7 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     );
   expect(protectedResourceMetadata.resource).toContain("/mcp");
   expect(protectedResourceMetadata.authorization_servers).toContain(
-    `${worker.baseUrl}/.well-known/oauth-authorization-server/api/auth`,
+    `${worker.baseUrl}/api/auth`,
   );
   expect(protectedResourceMetadata.scopes_supported).toContain("memory:write");
   expect(protectedResourceMetadata.bearer_methods_supported).toContain(
@@ -1616,7 +1616,7 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
       totalMemories: 1,
     },
     mcp: {
-      authorizationServer: `${worker.baseUrl}/.well-known/oauth-authorization-server/api/auth`,
+      authorizationServer: `${worker.baseUrl}/api/auth`,
       protectedResource: `${worker.baseUrl}/.well-known/oauth-protected-resource/mcp`,
       tools: expect.arrayContaining([
         "remember",
@@ -2817,7 +2817,7 @@ async function applyLocalMigrations(persistTo: string) {
       "d1",
       "migrations",
       "apply",
-      "openmemory-auth",
+      "austin-openmemory-auth",
       "--local",
       "--persist-to",
       persistTo,

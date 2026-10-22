@@ -772,8 +772,7 @@ const readiness: ReadinessSnapshot = {
   },
   mcp: {
     endpoint: "http://127.0.0.1:8787/mcp",
-    authorizationServer:
-      "http://127.0.0.1:8787/.well-known/oauth-authorization-server/api/auth",
+    authorizationServer: "http://127.0.0.1:8787/api/auth",
     protectedResource:
       "http://127.0.0.1:8787/.well-known/oauth-protected-resource/mcp",
     tools: ["remember", "recall", "profile", "forget"],

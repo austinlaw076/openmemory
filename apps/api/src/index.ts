@@ -1315,7 +1315,26 @@ async function handleWorkerFetch(
 ) {
   const startedAt = Date.now();
   const requestId = crypto.randomUUID();
-  const rateLimit = await checkGlobalRateLimit(request, requestEnv, startedAt);
+  const requestPathname = new URL(request.url).pathname;
+  const isRateLimitBypassPath =
+    requestPathname === "/health" || requestPathname === "/v1/readiness";
+  const rateLimit: RateLimitResult = isRateLimitBypassPath
+    ? {
+        enabled: true,
+        headers: {
+          "retry-after": "0",
+          "x-ratelimit-limit": "0",
+          "x-ratelimit-remaining": "0",
+          "x-ratelimit-reset": "0",
+          "x-ratelimit-scope": "global",
+        },
+        limit: 0,
+        limited: false,
+        remaining: 0,
+        retryAfterSeconds: 0,
+        scope: "global",
+      }
+    : await checkGlobalRateLimit(request, requestEnv, startedAt);
   let response: Response;
 
   try {
@@ -1411,15 +1430,41 @@ async function withCors(
   });
 }
 
+const ALLOWED_CORS_ORIGINS = new Set([
+  "https://openmemory.openvm067.space",
+  "https://austin-openmemory.austinlaw076.workers.dev",
+  "http://localhost:8787",
+  "http://127.0.0.1:8787",
+]);
+
+function isAllowedCorsOrigin(origin: string) {
+  if (ALLOWED_CORS_ORIGINS.has(origin)) {
+    return true;
+  }
+  try {
+    const url = new URL(origin);
+    return (
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1") &&
+      url.port === "8787"
+    );
+  } catch {
+    return false;
+  }
+}
+
 function corsHeaders(request: Request) {
-  const origin = request.headers.get("origin") ?? "*";
+  const origin = request.headers.get("origin");
+  const allowedOrigin =
+    origin && isAllowedCorsOrigin(origin)
+      ? origin
+      : "https://openmemory.openvm067.space";
 
   return new Headers({
     "access-control-allow-credentials": "true",
     "access-control-allow-headers":
       "authorization, content-type, x-openmemory-user-id",
     "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
-    "access-control-allow-origin": origin,
+    "access-control-allow-origin": allowedOrigin,
     vary: "Origin",
   });
 }

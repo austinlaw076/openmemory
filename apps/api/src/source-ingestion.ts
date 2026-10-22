@@ -15,7 +15,7 @@ import type { MemoryGraph } from "./memory-graph";
 import { enrichMemoryInput } from "./memory-signals";
 import { indexMemory } from "./semantic-index";
 
-export const SOURCE_INGESTION_QUEUE_NAME = "openmemory-source-ingestion";
+export const SOURCE_INGESTION_QUEUE_NAME = "austin-openmemory-source-ingestion";
 
 export type SourceIngestionMessage = {
   kind?: "source";

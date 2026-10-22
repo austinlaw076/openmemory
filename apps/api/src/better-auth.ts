@@ -36,9 +36,16 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
     baseURL,
     secret: env.BETTER_AUTH_SECRET ?? "openmemory-local-dev-secret-change-me",
     database: createAuthDatabase(env),
-    trustedOrigins: [baseURL],
+    trustedOrigins: [
+      ...new Set([
+        baseURL,
+        "https://openmemory.openvm067.space",
+        "https://austin-openmemory.austinlaw076.workers.dev",
+      ]),
+    ],
     emailAndPassword: {
       enabled: true,
+      disableSignUp: true,
     },
     socialProviders,
     advanced: {
@@ -105,9 +112,7 @@ export function handleOpenMemoryAuthRequest(env: Env, request: Request) {
     return json(
       {
         resource: `${resourceBaseUrl}/mcp`,
-        authorization_servers: [
-          `${authBaseUrl}/.well-known/oauth-authorization-server/api/auth`,
-        ],
+        authorization_servers: [`${authBaseUrl}/api/auth`],
         scopes_supported: ["openid", "profile", "memory:read", "memory:write"],
         bearer_methods_supported: ["header"],
       },

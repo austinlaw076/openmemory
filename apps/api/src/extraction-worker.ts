@@ -1,7 +1,8 @@
 import type { Env } from "./env";
 import { extractMemorySignals } from "./memory-signals";
 
-export const MEMORY_EXTRACTION_QUEUE_NAME = "openmemory-memory-extraction";
+export const MEMORY_EXTRACTION_QUEUE_NAME =
+  "austin-openmemory-memory-extraction";
 
 export type MemoryExtractionMessage = {
   version: 1;

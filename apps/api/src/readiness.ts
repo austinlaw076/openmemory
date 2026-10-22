@@ -184,7 +184,7 @@ export async function getReadinessSnapshot({
     },
     mcp: {
       endpoint: `${resourceBaseUrl}/mcp`,
-      authorizationServer: `${authBaseUrl}/.well-known/oauth-authorization-server/api/auth`,
+      authorizationServer: `${authBaseUrl}/api/auth`,
       protectedResource: `${resourceBaseUrl}/.well-known/oauth-protected-resource/mcp`,
       tools: ["remember", "recall", "profile", "forget"],
     },
