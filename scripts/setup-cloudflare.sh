@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+echo "Blocked: pre-created Austin resources; do not run upstream setup-cloudflare.sh" >&2
+exit 2
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

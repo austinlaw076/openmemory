@@ -26,7 +26,7 @@ type AlertConfig = {
   fetcher: typeof fetch;
 };
 
-const DEFAULT_DATASET = "openmemory_events";
+const DEFAULT_DATASET = "austin_openmemory_events";
 const DEFAULT_MIN_REQUESTS = 20;
 
 const rules: AlertRule[] = [
