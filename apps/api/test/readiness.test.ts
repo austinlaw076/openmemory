@@ -35,7 +35,7 @@ describe("readiness rerank diagnostics", () => {
     expect(readiness.rerank).toEqual({
       configured: false,
       workersAiConfigured: false,
-      timeoutMs: 900,
+      timeoutMs: 2500,
       status: "disabled",
     });
     expect(readiness.warnings).not.toContain(
@@ -70,7 +70,7 @@ describe("readiness rerank diagnostics", () => {
       configured: true,
       workersAiConfigured: true,
       model: "@cf/test/reranker",
-      timeoutMs: 900,
+      timeoutMs: 2500,
       status: "enabled",
     });
     expect(readiness.warnings).not.toContain(

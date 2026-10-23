@@ -30,7 +30,6 @@ type RerankMetadata = {
 type WorkersAiRerankResponse = {
   response?: unknown;
   result?: unknown;
-  choices?: Array<{ message?: { content?: unknown }; text?: unknown }>;
 };
 
 export async function searchMemories(
@@ -84,7 +83,10 @@ export async function rerankSearchResults(
   }
 
   const candidates = results.slice(0, 12);
-  const timeoutMs = parsePositiveInteger(env.OPENMEMORY_RERANK_TIMEOUT_MS, 900);
+  const timeoutMs = parsePositiveInteger(
+    env.OPENMEMORY_RERANK_TIMEOUT_MS,
+    2500,
+  );
   const model = env.OPENMEMORY_RERANK_MODEL;
 
   try {
@@ -128,23 +130,12 @@ async function runWorkersAiRerank(
   candidates: SearchResult[],
   timeoutMs: number,
 ) {
-  const prompt = [
-    "Rank OpenMemory candidates by usefulness for the query.",
-    'Return JSON only with shape {"ids":["candidate-id"]}.',
-    "Prefer current, specific, directly relevant memories. Do not invent ids.",
-    "",
-    `Query: ${query}`,
-    "",
-    "Candidates:",
-    ...candidates.map(
-      (candidate, index) =>
-        `${index + 1}. id=${candidate.id} score=${candidate.score.toFixed(3)} type=${candidate.type} tags=${candidate.tags.join(",")} content=${truncate(candidate.content, 700)}`,
-    ),
-  ].join("\n");
-
   const inference = env.AI?.run(model, {
-    prompt,
-    max_tokens: 256,
+    query,
+    contexts: candidates.map((candidate) => ({
+      text: truncate(candidate.content, 700),
+    })),
+    top_k: candidates.length,
   }) as Promise<WorkersAiRerankResponse>;
   const guardedInference = inference.catch(() => undefined);
   const response = await raceTimeout(guardedInference, timeoutMs);
@@ -152,51 +143,52 @@ async function runWorkersAiRerank(
     return [];
   }
 
-  const ids = parseRerankIds(response);
-  const allowed = new Set(candidates.map((candidate) => candidate.id));
-  const seen = new Set<string>();
-  return ids.filter((id) => {
-    if (!allowed.has(id) || seen.has(id)) {
-      return false;
-    }
-    seen.add(id);
-    return true;
-  });
-}
-
-function parseRerankIds(response: WorkersAiRerankResponse) {
-  const textCandidates = [
-    response.response,
-    response.result,
-    response.choices?.[0]?.message?.content,
-    response.choices?.[0]?.text,
-  ];
-  for (const candidate of textCandidates) {
-    if (typeof candidate !== "string") {
+  const rankedIndexes = parseRerankOrder(response);
+  const seen = new Set<number>();
+  const ids: string[] = [];
+  for (const index of rankedIndexes) {
+    if (index < 0 || index >= candidates.length || seen.has(index)) {
       continue;
     }
-    const parsed = parseJsonObject(candidate);
-    if (Array.isArray(parsed?.ids)) {
-      return parsed.ids.filter((id): id is string => typeof id === "string");
+    seen.add(index);
+    const candidate = candidates[index];
+    if (candidate) {
+      ids.push(candidate.id);
     }
   }
-  return [];
+  return ids;
 }
 
-function parseJsonObject(text: string) {
-  const trimmed = text.trim();
-  const jsonText = trimmed.startsWith("{")
-    ? trimmed
-    : trimmed.slice(trimmed.indexOf("{"), trimmed.lastIndexOf("}") + 1);
-  if (!jsonText) {
-    return undefined;
+function parseRerankOrder(response: WorkersAiRerankResponse) {
+  const ranking = extractRerankRanking(response);
+  if (!ranking) {
+    return [];
   }
 
-  try {
-    return JSON.parse(jsonText) as { ids?: unknown };
-  } catch {
-    return undefined;
+  return ranking
+    .filter(
+      (entry): entry is { id: number; score: number } =>
+        isRecord(entry) &&
+        typeof entry.id === "number" &&
+        Number.isFinite(entry.id) &&
+        typeof entry.score === "number" &&
+        Number.isFinite(entry.score),
+    )
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.id);
+}
+
+function extractRerankRanking(response: WorkersAiRerankResponse) {
+  if (Array.isArray(response)) {
+    return response as unknown[];
   }
+  if (Array.isArray(response.response)) {
+    return response.response as unknown[];
+  }
+  if (isRecord(response.result) && Array.isArray(response.result.response)) {
+    return response.result.response as unknown[];
+  }
+  return undefined;
 }
 
 function assembleContext(

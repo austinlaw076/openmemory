@@ -133,9 +133,10 @@ Responses include `x-openmemory-request-id`, `x-ratelimit-limit`,
 `x-ratelimit-remaining`, `x-ratelimit-reset`, and `x-ratelimit-scope`.
 
 Optional recall reranking can be enabled by setting `OPENMEMORY_RERANK_MODEL`
-to a Workers AI text-generation model. When unset, recall uses deterministic
-ranking only. `OPENMEMORY_RERANK_TIMEOUT_MS` defaults to `900`; timeout,
-malformed model output, or local binding gaps fall back to deterministic order.
+to a Workers AI reranker model such as `@cf/baai/bge-reranker-base`. When
+unset, recall uses deterministic ranking only. `OPENMEMORY_RERANK_TIMEOUT_MS`
+defaults to `2500`; timeout, malformed model output, or local binding gaps
+fall back to deterministic order.
 
 Optional alert dispatch can be enabled for the built-in Cloudflare Cron health
 monitor:

@@ -284,7 +284,7 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     rerank: {
       configured: false,
       workersAiConfigured: true,
-      timeoutMs: 900,
+      timeoutMs: 2500,
       status: "disabled",
     },
   });

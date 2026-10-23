@@ -297,7 +297,10 @@ function getRerankReadiness(env: Env): RerankReadiness {
   const model = normalizeOptionalEnv(env.OPENMEMORY_RERANK_MODEL);
   const configured = Boolean(model);
   const workersAiConfigured = Boolean(env.AI);
-  const timeoutMs = parsePositiveInteger(env.OPENMEMORY_RERANK_TIMEOUT_MS, 900);
+  const timeoutMs = parsePositiveInteger(
+    env.OPENMEMORY_RERANK_TIMEOUT_MS,
+    2500,
+  );
 
   return {
     configured,
