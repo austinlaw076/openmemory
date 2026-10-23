@@ -1348,6 +1348,117 @@ test("worker emits operational headers and rate limits repeated requests", async
   });
 }, 45_000);
 
+test("worker API accepts the API token as an additional credential without gating session auth", async () => {
+  const apiToken = `test-api-token-${crypto.randomUUID()}`;
+  const worker = await startWorker({
+    OPENMEMORY_ALLOW_SIGN_UP: "true",
+    OPENMEMORY_API_TOKEN: apiToken,
+  });
+  workers.push(worker);
+
+  const email = `api-token-${crypto.randomUUID()}@example.com`;
+  const signUp = await worker.fetch("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "API Token User",
+      email,
+      password: "<redacted>",
+    }),
+  });
+  await expectOk(signUp);
+  const cookie = getCookieHeader(signUp);
+  expect(cookie).toContain("better-auth");
+
+  const session = await getJson<SessionResponse>(
+    await worker.fetch("/api/auth/get-session", {
+      headers: { cookie },
+    }),
+  );
+  const tenantId = session.user.id;
+
+  // Regression for the 2026-10-21 incident: with OPENMEMORY_API_TOKEN
+  // configured, session-cookie API calls that carry no bearer token must
+  // keep working instead of being rejected by a token gate.
+  const sessionProfile = await worker.fetch("/v1/profile", {
+    headers: { cookie },
+  });
+  expect(sessionProfile.status).toBe(200);
+
+  const sessionMemory = await getJson<MemoryResponse>(
+    await worker.fetch("/v1/memories", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        content:
+          "Stored through the dashboard session while an API token is configured.",
+      }),
+    }),
+  );
+  expect(sessionMemory.id).toBeTruthy();
+
+  // The token channel authenticates with the tenant header and no cookie.
+  const tokenHeaders = {
+    authorization: `Bearer ${apiToken}`,
+    "x-openmemory-user-id": tenantId,
+  };
+  const tokenProfile = await worker.fetch("/v1/profile", {
+    headers: tokenHeaders,
+  });
+  expect(tokenProfile.status).toBe(200);
+
+  const tokenMemory = await getJson<MemoryResponse>(
+    await worker.fetch("/v1/memories", {
+      method: "POST",
+      headers: { ...tokenHeaders, "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "Stored through the API token channel.",
+      }),
+    }),
+  );
+  expect(tokenMemory.id).toBeTruthy();
+
+  const tokenList = await getJson<MemoryResponse[]>(
+    await worker.fetch("/v1/memories", { headers: tokenHeaders }),
+  );
+  expect(tokenList.map((memory) => memory.id)).toContain(sessionMemory.id);
+  expect(tokenList.map((memory) => memory.id)).toContain(tokenMemory.id);
+
+  // Readiness reports the api-token principal honestly.
+  const readiness = await getJson<ReadinessResponse>(
+    await worker.fetch("/v1/readiness", { headers: tokenHeaders }),
+  );
+  expect(readiness.tenant.source).toBe("api-token");
+  expect(readiness.tenant.id).toBe(tenantId.toLowerCase());
+
+  // A wrong bearer token fails closed even with the tenant header present.
+  const wrongToken = await worker.fetch("/v1/profile", {
+    headers: {
+      authorization: "Bearer not-the-configured-token",
+      "x-openmemory-user-id": tenantId,
+    },
+  });
+  expect(wrongToken.status).toBe(401);
+
+  // MCP works over the token channel without an OAuth JWT.
+  const mcpTools = await getJson<JsonRpcResponse>(
+    await worker.fetch("/mcp", {
+      method: "POST",
+      headers: {
+        ...tokenHeaders,
+        accept: "application/json, text/event-stream",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 0,
+        method: "tools/list",
+      }),
+    }),
+  );
+  expect(JSON.stringify(mcpTools.result)).toContain("remember");
+}, 45_000);
+
 test("worker API uses Better Auth session cookies as deployed tenant identity", async () => {
   const worker = await startWorker({
     OPENMEMORY_ALLOW_SIGN_UP: "true",
@@ -3118,7 +3229,7 @@ type ReadinessResponse = {
   service: "openmemory-api";
   tenant: {
     id: string;
-    source: "session" | "local-header";
+    source: "api-token" | "session" | "local-header";
     localDevelopment: boolean;
   };
   graph: {

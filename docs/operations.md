@@ -251,6 +251,7 @@ current tenant graph should be wiped before restoring the export.
    curl -X POST "$OPENMEMORY_API_URL/v1/imports/preview" \
      -H "content-type: application/json" \
      -H "authorization: Bearer $OPENMEMORY_API_TOKEN" \
+     -H "x-openmemory-user-id: $OPENMEMORY_TENANT_ID" \
      -d @restore-payload.json
    ```
 
@@ -267,6 +268,7 @@ current tenant graph should be wiped before restoring the export.
    curl -X POST "$OPENMEMORY_API_URL/v1/imports" \
      -H "content-type: application/json" \
      -H "authorization: Bearer $OPENMEMORY_API_TOKEN" \
+     -H "x-openmemory-user-id: $OPENMEMORY_TENANT_ID" \
      -d @restore-payload.json
    ```
 

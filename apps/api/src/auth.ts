@@ -6,10 +6,14 @@ const USER_HEADER = "x-openmemory-user-id";
 
 export type HeaderSource = Headers | Record<string, string | undefined>;
 
+export type TenantResolution =
+  | { tenantId: string }
+  | { error: string; message?: string };
+
 export function resolveTenant(
   headers: HeaderSource,
   options: { allowHeaderTenant?: boolean } = {},
-) {
+): TenantResolution {
   if (options.allowHeaderTenant === false) {
     return {
       error: "header_tenant_disabled" as const,
@@ -36,21 +40,107 @@ export function resolveTenant(
   return { tenantId };
 }
 
-export function resolveAuth(env: Env, headers: HeaderSource) {
-  if (!env.OPENMEMORY_API_TOKEN) {
-    return { ok: true as const };
+export type ApiTokenStatus = "absent" | "disabled" | "matched" | "mismatch";
+
+/**
+ * The API token is an additional accepted credential, never a gate: when it
+ * is not configured the channel is disabled, and requests that do not carry
+ * it fall back to the existing session / header-tenant behavior unchanged.
+ */
+export function getApiTokenStatus(
+  env: Env,
+  headers: HeaderSource,
+): ApiTokenStatus {
+  const configured = env.OPENMEMORY_API_TOKEN;
+  if (!configured) {
+    return "disabled";
   }
 
-  const expected = `Bearer ${env.OPENMEMORY_API_TOKEN}`;
-  if (getHeader(headers, "authorization") === expected) {
-    return { ok: true as const };
+  const authorization = getHeader(headers, "authorization");
+  if (!authorization) {
+    return "absent";
   }
 
+  return timingSafeEqual(authorization, `Bearer ${configured}`)
+    ? "matched"
+    : "mismatch";
+}
+
+export type RequestTenantResolution =
+  | {
+      tenantId: string;
+      principal: "api-token" | "header" | "session";
+      sessionTenant: { tenantId: string } | undefined;
+    }
+  | { error: string; message?: string };
+
+/**
+ * Resolves the tenant for a REST request. Precedence:
+ * 1. A matching API token authenticates the request on any host; the tenant
+ *    comes from the tenant header.
+ * 2. A Better Auth session cookie identifies the tenant as before.
+ * 3. A present-but-wrong bearer token with no valid session fails closed
+ *    with 401 instead of downgrading to header-tenant mode.
+ * 4. Otherwise the legacy rule applies: header tenant only on localhost.
+ */
+export async function resolveRequestTenant(
+  env: Env,
+  request: Request,
+  headers: HeaderSource,
+): Promise<RequestTenantResolution> {
+  const tokenStatus = getApiTokenStatus(env, headers);
+
+  if (tokenStatus === "matched") {
+    const tenant = resolveTenant(headers, { allowHeaderTenant: true });
+    if ("error" in tenant) {
+      return tenant;
+    }
+    return {
+      tenantId: tenant.tenantId,
+      principal: "api-token",
+      sessionTenant: undefined,
+    };
+  }
+
+  const sessionTenant = await resolveSessionTenant(env, request);
+  if (sessionTenant) {
+    return {
+      tenantId: sessionTenant.tenantId,
+      principal: "session",
+      sessionTenant,
+    };
+  }
+
+  if (tokenStatus === "mismatch") {
+    return {
+      error: "unauthorized",
+      message: "Pass a valid bearer token.",
+    };
+  }
+
+  const tenant = resolveTenant(headers, {
+    allowHeaderTenant: isLocalDevelopmentRequest(request),
+  });
+  if ("error" in tenant) {
+    return tenant;
+  }
   return {
-    ok: false as const,
-    error: "unauthorized" as const,
-    message: "Pass a valid bearer token.",
+    tenantId: tenant.tenantId,
+    principal: "header",
+    sessionTenant: undefined,
   };
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const encoder = new TextEncoder();
+  const aBytes = encoder.encode(a);
+  const bBytes = encoder.encode(b);
+  let diff = aBytes.length ^ bBytes.length;
+  const length = Math.max(aBytes.length, bBytes.length);
+  for (let index = 0; index < length; index += 1) {
+    diff |= (aBytes[index] ?? 0) ^ (bBytes[index] ?? 0);
+  }
+  return diff === 0;
 }
 
 export const getGraph = (env: Env, tenantId: string) => {

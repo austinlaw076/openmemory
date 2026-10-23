@@ -43,7 +43,7 @@ export type ReadinessSnapshot = {
   generatedAt: string;
   tenant: {
     id: string;
-    source: "session" | "local-header";
+    source: "api-token" | "session" | "local-header";
     localDevelopment: boolean;
   };
   graph: {
@@ -73,7 +73,7 @@ export type ReadinessSnapshot = {
     boolean
   >;
   auth: {
-    mode: "session" | "local-development-header";
+    mode: "api-token" | "session" | "local-development-header";
     betterAuthUrl: string;
     socialProviders: SocialProviderReadiness;
   };
@@ -116,12 +116,14 @@ type SocialProviderReadiness = Record<
 export async function getReadinessSnapshot({
   env,
   graph,
+  principal,
   request,
   sessionTenant,
   tenantId,
 }: {
   env: Env;
   graph: GraphReadiness;
+  principal?: "api-token" | "header" | "session";
   request: Request;
   sessionTenant?: Awaited<ReturnType<typeof resolveSessionTenant>>;
   tenantId: string;
@@ -140,7 +142,11 @@ export async function getReadinessSnapshot({
   const resourceBaseUrl = resolveResourceBaseUrl(authBaseUrl);
   const rateLimit = getRateLimitSettings(request, env);
   const localDevelopment = isLocalDevelopmentRequest(request);
-  const source = sessionTenant ? "session" : "local-header";
+  const source = sessionTenant
+    ? "session"
+    : principal === "api-token"
+      ? "api-token"
+      : "local-header";
   const rerank = getRerankReadiness(env);
   const socialProviders = getSocialProviderReadiness(env);
 
@@ -178,7 +184,12 @@ export async function getReadinessSnapshot({
       sourceIngestionWorkflow: Boolean(env.SOURCE_INGESTION_WORKFLOW),
     },
     auth: {
-      mode: source === "session" ? "session" : "local-development-header",
+      mode:
+        source === "session"
+          ? "session"
+          : source === "api-token"
+            ? "api-token"
+            : "local-development-header",
       betterAuthUrl: authBaseUrl,
       socialProviders,
     },
@@ -223,7 +234,7 @@ function getReadinessWarnings({
   rerank: RerankReadiness;
   semanticIndex: SemanticIndexDiagnostic;
   socialProviders: SocialProviderReadiness;
-  source: "session" | "local-header";
+  source: "api-token" | "session" | "local-header";
   stats: GraphStats;
 }) {
   const warnings: string[] = [];

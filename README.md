@@ -200,9 +200,13 @@ Useful endpoints:
 - `GET /.well-known/openid-configuration`
 - `/api/auth/*`
 
-During local development, pass `x-openmemory-user-id: local-user`. If
-`OPENMEMORY_API_TOKEN` is configured, also pass `Authorization: Bearer <token>`.
-Production rejects tenant headers by design and uses OAuth-backed identity.
+During local development, pass `x-openmemory-user-id: local-user`. Production
+uses session cookies or OAuth-backed identity by default and rejects tenant
+headers. As an additional machine credential, when `OPENMEMORY_API_TOKEN` is
+configured, a request carrying `Authorization: Bearer <token>` together with
+`x-openmemory-user-id: <tenant>` is accepted on any host for both the REST API
+and MCP. The token is never a gate: requests without it keep the existing
+session/OAuth behavior, and a wrong bearer token fails with 401.
 Every response includes `x-openmemory-request-id` and rate-limit headers for
 supportability. Configure the per-isolate safety valve with
 `OPENMEMORY_RATE_LIMIT_PER_MINUTE` or disable it with

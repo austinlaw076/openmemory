@@ -118,11 +118,19 @@ hosted sign-in through each provider, update the evidence ledger, and run:
 bun run social-oauth:check
 ```
 
-Optional machine-token fallback:
+Optional machine-token channel (an additional credential for programmatic
+REST/MCP access, never a replacement for session or OAuth auth):
 
 ```sh
 bun --cwd apps/api wrangler secret put OPENMEMORY_API_TOKEN
 ```
+
+When set, requests with `Authorization: Bearer <token>` plus an
+`x-openmemory-user-id` tenant header are accepted on any host; the token
+grants full read/write access to that tenant, so store it in a secrets
+manager and rotate it by replacing the secret. Requests without the token
+are unaffected: dashboard session cookies and MCP OAuth tokens keep working
+exactly as before, and a wrong bearer token returns 401.
 
 Optional operational controls can be set as Cloudflare environment variables or
 dashboard-managed secrets. `OPENMEMORY_RATE_LIMIT_PER_MINUTE` defaults to `600`

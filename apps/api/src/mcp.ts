@@ -9,9 +9,9 @@ import { verifyJwsAccessToken } from "better-auth/oauth2";
 import type { JSONWebKeySet } from "jose";
 import * as z from "zod/v3";
 import {
+  getApiTokenStatus,
   getGraph,
   isLocalDevelopmentRequest,
-  resolveAuth,
   resolveTenant,
 } from "./auth";
 import { resolveAuthBaseUrl } from "./better-auth";
@@ -27,6 +27,14 @@ export function createOpenMemoryMcpHandler(): (
 ) => Promise<Response> {
   return async (request: Request, env: Env, ctx: ExecutionContext) => {
     if (!isLocalDevelopmentRequest(request)) {
+      // A matching API token is an additional credential alongside OAuth:
+      // it skips JWT verification and takes the tenant from the header.
+      if (getApiTokenStatus(env, request.headers) === "matched") {
+        return handleMcpRequest(request, env, ctx, {
+          allowHeaderTenant: true,
+        });
+      }
+
       const authBaseURL = resolveAuthBaseUrl(env, request);
       const resourceBaseURL = resolveResourceBaseUrl(authBaseURL);
       const jwt = await verifyMcpBearerToken(
@@ -55,6 +63,7 @@ export function createOpenMemoryMcpHandler(): (
 
       return handleMcpRequest(withTenantHeader(request, tenantId), env, ctx, {
         allowHeaderTenant: true,
+        preAuthenticated: true,
       });
     }
 
@@ -68,14 +77,26 @@ async function handleMcpRequest(
   request: Request,
   env: Env,
   ctx: ExecutionContext,
-  options: { allowHeaderTenant: boolean } = { allowHeaderTenant: false },
+  options: { allowHeaderTenant: boolean; preAuthenticated?: boolean } = {
+    allowHeaderTenant: false,
+  },
 ): Promise<Response> {
-  const auth = resolveAuth(env, request.headers);
-  if (!auth.ok) {
-    return json({ error: auth.error, message: auth.message }, 401);
+  const tokenStatus = getApiTokenStatus(env, request.headers);
+  let tenant: ReturnType<typeof resolveTenant>;
+  if (tokenStatus === "matched") {
+    tenant = resolveTenant(request.headers, { allowHeaderTenant: true });
+  } else if (options.preAuthenticated) {
+    // The caller already verified an OAuth JWT for this request; the static
+    // token channel must never gate that path.
+    tenant = resolveTenant(request.headers, options);
+  } else if (tokenStatus === "mismatch") {
+    return json(
+      { error: "unauthorized", message: "Pass a valid bearer token." },
+      401,
+    );
+  } else {
+    tenant = resolveTenant(request.headers, options);
   }
-
-  const tenant = resolveTenant(request.headers, options);
   if ("error" in tenant) {
     return json(tenant, 401);
   }

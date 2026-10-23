@@ -27,14 +27,7 @@ import {
   updateAccountProfile,
 } from "./account";
 import { runScheduledHealthMonitor } from "./alerting";
-import {
-  getGraph,
-  type HeaderSource,
-  isLocalDevelopmentRequest,
-  resolveAuth,
-  resolveSessionTenant,
-  resolveTenant,
-} from "./auth";
+import { getGraph, type HeaderSource, resolveRequestTenant } from "./auth";
 import {
   handleOpenMemoryAuthRequest,
   isAuthRoute,
@@ -280,39 +273,21 @@ const workspaceMemberBody = t.Object({
 });
 
 async function withTenant(request: Request, headers: HeaderSource) {
-  const auth = resolveAuth(env, headers);
-  if (!auth.ok) {
+  const resolved = await resolveRequestTenant(env, request, headers);
+  if ("error" in resolved) {
     return {
-      tenant: auth,
+      tenant: resolved,
       graph: undefined,
       sessionTenant: undefined,
-    };
-  }
-
-  const sessionTenant = await resolveSessionTenant(env, request);
-  if (sessionTenant) {
-    return {
-      tenant: sessionTenant,
-      graph: getGraph(env, sessionTenant.tenantId),
-      sessionTenant,
-    };
-  }
-
-  const tenant = resolveTenant(headers, {
-    allowHeaderTenant: isLocalDevelopmentRequest(request),
-  });
-  if ("error" in tenant) {
-    return {
-      tenant,
-      graph: undefined,
-      sessionTenant: undefined,
+      principal: undefined,
     };
   }
 
   return {
-    tenant,
-    graph: getGraph(env, tenant.tenantId),
-    sessionTenant: undefined,
+    tenant: { tenantId: resolved.tenantId },
+    graph: getGraph(env, resolved.tenantId),
+    sessionTenant: resolved.sessionTenant,
+    principal: resolved.principal,
   };
 }
 
@@ -820,7 +795,10 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     return graph.getProfile();
   })
   .get("/v1/readiness", async ({ headers, request, status }) => {
-    const { tenant, graph, sessionTenant } = await withTenant(request, headers);
+    const { tenant, graph, principal, sessionTenant } = await withTenant(
+      request,
+      headers,
+    );
     if (!graph) {
       return status(errorStatus(tenantError(tenant)), tenant);
     }
@@ -829,6 +807,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     return getReadinessSnapshot({
       env,
       graph,
+      principal,
       request,
       sessionTenant,
       tenantId,
