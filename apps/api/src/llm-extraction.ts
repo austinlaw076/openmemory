@@ -28,7 +28,7 @@ const GEMINI_GATEWAY_BASE =
   "https://gateway.ai.cloudflare.com/v1/7b4a06f2fcfaa0169d55051dc7c7eff0/austin-llm-gateway/google-ai-studio";
 const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 const DEFAULT_WORKERS_AI_MODEL = "@cf/qwen/qwen3-30b-a3b-fp8";
-const DEFAULT_OPENROUTER_MODEL = "google/gemma-4-31b-it:free";
+const DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free";
 const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
