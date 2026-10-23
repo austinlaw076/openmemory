@@ -2479,6 +2479,20 @@ test("graph stats and recall stay bounded on a larger local graph", async () => 
   expect(elapsedMs).toBeLessThan(7_500);
 }, 180_000);
 
+test("login page resumes OAuth authorization after sign-in", async () => {
+  const worker = await startWorker();
+  workers.push(worker);
+
+  const login = await worker.fetch("/login");
+  expect(login.status).toBe(200);
+  const html = await login.text();
+  expect(html).toContain('params.has("sig")');
+  expect(html).toContain('params.has("client_id")');
+  expect(html).toContain(
+    '"/api/auth/oauth2/authorize?" + location.search.slice(1)',
+  );
+}, 180_000);
+
 test("auth helpers keep tenant headers local-only", () => {
   const local = new Request("http://127.0.0.1:54150/v1/memories");
   const deployed = new Request("https://openmemory.example/v1/memories");

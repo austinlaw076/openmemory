@@ -1533,7 +1533,13 @@ const LOGIN_HTML = `<!doctype html>
       const body = { email: email.value, password: password.value, name: name.value || email.value };
       const response = await fetch(path, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       if (!response.ok) throw new Error(await response.text());
-      const next = new URLSearchParams(location.search).get("redirect") || "/";
+      const params = new URLSearchParams(location.search);
+      const redirect = params.get("redirect");
+      const next =
+        redirect ||
+        (params.has("sig") && params.has("client_id")
+          ? "/api/auth/oauth2/authorize?" + location.search.slice(1)
+          : "/");
       location.href = next;
     }
     form.onsubmit = (event) => { event.preventDefault(); auth("/api/auth/sign-in/email").catch((caught) => showError(caught.message)); };
