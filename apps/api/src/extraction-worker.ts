@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { extractSignalsWithLlm } from "./llm-extraction";
 import { extractMemorySignals } from "./memory-signals";
 
 export const MEMORY_EXTRACTION_QUEUE_NAME =
@@ -53,12 +54,26 @@ export async function processMemoryExtractionMessage(
     };
   }
 
-  const signals = extractMemorySignals(memory.content);
-  const result = await graph.applyExtractedSignals(message.memoryId, signals);
+  const llm = await extractSignalsWithLlm(env, memory.content).catch(
+    () => undefined,
+  );
+  const signals = llm?.signals ?? extractMemorySignals(memory.content);
+  const result = await graph.applyExtractedSignals(message.memoryId, {
+    ...signals,
+    ...(llm
+      ? {
+          strategy: `llm-${llm.provider}`,
+          provider: llm.provider,
+          model: llm.model,
+        }
+      : {}),
+  });
   return {
     applied: result.applied,
     edgeCount: result.edges.length,
     entityCount: signals.entityIds.length,
+    extractionModel: llm?.model,
+    extractionProvider: llm?.provider,
     memoryId: message.memoryId,
     relationshipCount: signals.relationships.length,
   };

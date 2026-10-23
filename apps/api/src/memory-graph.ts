@@ -48,6 +48,9 @@ type ExtractedSignalsInput = {
   entityIds: string[];
   relationships: ExtractedRelationship[];
   tags: string[];
+  strategy?: string;
+  provider?: string;
+  model?: string;
 };
 
 type MemoryGraphEnv = Record<string, unknown>;
@@ -232,7 +235,9 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
         ...(isRecord(memory.metadata.extraction)
           ? memory.metadata.extraction
           : {}),
-        strategy: "deterministic-worker-v1",
+        strategy: input.strategy ?? "deterministic-worker-v1",
+        ...(input.provider ? { provider: input.provider } : {}),
+        ...(input.model ? { model: input.model } : {}),
         entityIds: input.entityIds,
         relationships: input.relationships,
         tags: input.tags,
