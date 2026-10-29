@@ -1306,6 +1306,90 @@ test("MCP streamable HTTP compatibility covers handshake and optional surfaces",
   expect(JSON.stringify(contextPrompt.result)).toContain("launch context");
 }, 45_000);
 
+test("MCP tools/list marks read tools read-only so clients can skip approval", async () => {
+  const worker = await startWorker();
+  workers.push(worker);
+
+  const tenant = `mcp-annotations-${crypto.randomUUID()}`;
+  const headers = {
+    ...tenantHeaders(tenant),
+    accept: "application/json, text/event-stream",
+    "content-type": "application/json",
+  };
+
+  const initialized = await getJson<JsonRpcResponse>(
+    await worker.fetch("/mcp", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "init",
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: {
+            name: "openmemory-vitest-client",
+            version: "0.0.0",
+          },
+        },
+      }),
+    }),
+  );
+  expect(initialized.error).toBeUndefined();
+
+  const initializedNotification = await worker.fetch("/mcp", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      method: "notifications/initialized",
+      params: {},
+    }),
+  });
+  expect(initializedNotification.status).toBeGreaterThanOrEqual(200);
+  expect(initializedNotification.status).toBeLessThan(300);
+
+  const tools = await getJson<JsonRpcResponse>(
+    await worker.fetch("/mcp", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "tools",
+        method: "tools/list",
+      }),
+    }),
+  );
+  expect(tools.error).toBeUndefined();
+  const listed = (
+    tools.result as {
+      tools?: Array<{ name: string; annotations?: Record<string, unknown> }>;
+    }
+  ).tools;
+  expect(listed).toBeDefined();
+  const byName = new Map(
+    (listed ?? []).map((tool) => [tool.name, tool.annotations]),
+  );
+  expect(byName.get("recall")).toMatchObject({
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  });
+  expect(byName.get("profile")).toMatchObject({
+    readOnlyHint: true,
+    destructiveHint: false,
+    idempotentHint: true,
+    openWorldHint: false,
+  });
+  expect(byName.get("remember")).toMatchObject({ readOnlyHint: false });
+  expect(byName.get("forget")).toMatchObject({
+    readOnlyHint: false,
+    destructiveHint: true,
+  });
+}, 45_000);
+
 test("worker emits operational headers and rate limits repeated requests", async () => {
   const worker = await startWorker({
     OPENMEMORY_RATE_LIMIT_PER_MINUTE: "2",

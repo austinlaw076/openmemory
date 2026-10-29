@@ -128,6 +128,12 @@ async function handleMcpRequest(
         .optional(),
       metadata: z.record(z.unknown()).optional(),
     },
+    {
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: false,
+    },
     async ({ content, tags = [], type = "fact", metadata = {} }) => {
       const memory = await graph.createMemory(
         CreateMemorySchema.parse({
@@ -150,6 +156,12 @@ async function handleMcpRequest(
       query: z.string().min(1),
       limit: z.number().int().min(1).max(30).optional(),
       includeHistorical: z.boolean().optional(),
+    },
+    {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
     },
     async ({ query, limit = 8, includeHistorical = false }) => {
       const context = await buildRecallContext(
@@ -175,6 +187,12 @@ async function handleMcpRequest(
       id: z.string().min(1),
       reason: z.string().optional(),
     },
+    {
+      readOnlyHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     async ({ id, reason }) => {
       const memory = await graph.forgetMemory(
         id,
@@ -189,6 +207,12 @@ async function handleMcpRequest(
     "profile",
     "Return stable and current profile context.",
     {},
+    {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     async () => {
       const profile = await graph.getProfile();
       return textTool(profile.summary);
